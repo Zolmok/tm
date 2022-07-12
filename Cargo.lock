@@ -5,6 +5,7 @@ version = 3
 [[package]]
 name = "scuttle"
 version = "0.4.0"
+source = "git+https://github.com/Zolmok/scuttle?tag=v0.4.0#9a183a9c303e83d2bfa90a3f7fc9ec740f45afbe"
 
 [[package]]
 name = "tm"
