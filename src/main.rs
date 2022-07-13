@@ -40,7 +40,7 @@ fn main() {
                             Err(error) => panic!("error: {}", error),
                         };
 
-                        let choice_index = match choice.trim().parse::<usize>() {
+                        let choice_index: usize = match choice.trim().parse::<usize>() {
                             Ok(result) => result,
                             Err(error) => {
                                 println!("error: {}", error);
@@ -49,7 +49,7 @@ fn main() {
                             }
                         };
 
-                        if choice_index > count || choice_index < count {
+                        if choice_index > count || choice_index < 1 {
                             println!("You didn't select an appropriate choice");
                         } else {
                             // we need the actual session name associated with the choice the user made

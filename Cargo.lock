@@ -9,7 +9,7 @@ source = "git+https://github.com/Zolmok/scuttle?tag=v0.4.0#9a183a9c303e83d2bfa90
 
 [[package]]
 name = "tm"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "scuttle",
 ]
