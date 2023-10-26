@@ -2,16 +2,16 @@
   "session": "tm",
   "windows": [
     {
-      "name": "Build",
-      "actions": ["cargo watch -x test -x build"],
-      "pwd": ".",
-      "select": true
-    },
-    {
       "name": "Code",
       "actions": [],
       "pwd": ".",
       "select": false
+    },
+    {
+      "name": "Build",
+      "actions": ["bacon"],
+      "pwd": ".",
+      "select": true
     },
     {
       "name": "Zsh",

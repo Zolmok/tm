@@ -29,7 +29,7 @@ fn main() {
                         // `print!` doesn't output until we do this
                         match io::stdout().flush() {
                             Ok(_result) => (),
-                            Err(error) => panic!("error: {}", error)
+                            Err(error) => panic!("error: {}", error),
                         };
 
                         let mut choice = String::new();
