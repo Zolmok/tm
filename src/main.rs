@@ -1,75 +1,111 @@
+use std::collections::HashSet;
 use std::io;
 use std::io::Write;
 
-extern crate scuttle;
+mod fs_utils;
+mod process_utils;
+mod session_utils;
 
+use fs_utils::prompt_valid_path;
+use process_utils::{run_output, run_status};
+use session_utils::resolve_session_name;
+
+/// Entry point for the tmux session manager CLI.
+///
+/// This tool lists existing tmux sessions and allows the user to:
+/// 1. Attach to an existing session.
+/// 2. Create a new session from a specified directory.
 fn main() {
-    // list the available tmux sessions
-    // tmux ls -F "#S"
-    let tmux_list_sessions = scuttle::App {
-        command: String::from("tmux"),
-        args: vec!["ls".to_string(), "-F".to_string(), "#S".to_string()],
-    };
+    let args = vec!["ls".to_string(), "-F".to_string(), "#S".to_string()];
 
-    match scuttle::run_output(&tmux_list_sessions) {
+    match run_output("tmux", &args) {
         Ok(output) => {
             match std::str::from_utf8(&output.stdout) {
                 Ok(result) => {
-                    // lines will be the list of tmux sessions
-                    let count = result.lines().count();
                     let lines: Vec<&str> = result.lines().collect();
+                    let count = lines.len();
+                    let existing_sessions: HashSet<&str> = lines.iter().copied().collect();
 
                     if count > 0 {
-                        // print the sessions with an index from which to choose (1 based)
-                        result.lines().enumerate().for_each(|(index, line)| {
+                        lines.iter().enumerate().for_each(|(index, line)| {
                             println!("{}) {}", index + 1, line);
                         });
+                    } else {
+                        println!("No existing tmux sessions found.");
+                    }
 
-                        print!("$ ");
-                        // `print!` doesn't output until we do this
-                        match io::stdout().flush() {
-                            Ok(_result) => (),
-                            Err(error) => panic!("error: {}", error),
-                        };
+                    print!("Select a session number or type 'n' to create a new session: ");
+                    io::stdout().flush().expect("Failed to flush stdout");
 
-                        let mut choice = String::new();
-                        let stdin = io::stdin();
+                    let mut choice = String::new();
 
-                        match stdin.read_line(&mut choice) {
-                            Ok(_result) => (),
-                            Err(error) => panic!("error: {}", error),
-                        };
+                    io::stdin()
+                        .read_line(&mut choice)
+                        .expect("Failed to read input");
 
-                        let choice_index: usize = match choice.trim().parse::<usize>() {
-                            Ok(result) => result,
-                            Err(error) => {
-                                println!("error: {}", error);
-                                // return something out of bounds so the `if` below fails
-                                count + 1
+                    let trimmed_choice = choice.trim();
+
+                    if trimmed_choice.eq_ignore_ascii_case("n") {
+                        let full_path = prompt_valid_path();
+
+                        let suggested_name = match full_path.file_name() {
+                            Some(name) => name.to_string_lossy().to_string(),
+                            None => {
+                                println!("Could not extract session name from path.");
+                                return;
                             }
                         };
 
-                        if choice_index > count || choice_index < 1 {
-                            println!("You didn't select an appropriate choice");
-                        } else {
-                            // we need the actual session name associated with the choice the user made
-                            let session = lines[choice_index - 1].to_string();
-                            // attach to the session that was chosen
-                            // tmux attach -t <session>
-                            let tmux_attach = scuttle::App {
-                                command: String::from("tmux"),
-                                args: vec!["attach".to_string(), "-t".to_string(), session],
-                            };
-
-                            match scuttle::run_status(&tmux_attach) {
-                                Ok(_status) => (),
-                                Err(error) => panic!("error: {}", error),
-                            };
+                        match resolve_session_name(&suggested_name, &existing_sessions) {
+                            Some(session_name) => {
+                                let args = vec![
+                                    "new-session".to_string(),
+                                    "-s".to_string(),
+                                    session_name,
+                                    "-c".to_string(),
+                                    full_path.display().to_string(),
+                                ];
+                                match run_status("tmux", &args) {
+                                    Ok(_status) => (),
+                                    Err(e) => panic!("Failed to start session: {}", e),
+                                }
+                            }
+                            None => {
+                                let attach_args =
+                                    vec!["attach".to_string(), "-t".to_string(), suggested_name];
+                                match run_status("tmux", &attach_args) {
+                                    Ok(_status) => (),
+                                    Err(e) => panic!("Failed to attach: {}", e),
+                                }
+                            }
                         }
+
+                        return;
+                    }
+
+                    let choice_index: usize = match trimmed_choice.parse::<usize>() {
+                        Ok(result) => result,
+                        Err(error) => {
+                            println!("error: {}", error);
+                            count + 1
+                        }
+                    };
+
+                    if choice_index > count || choice_index < 1 {
+                        println!("You didn't select an appropriate choice");
+                    } else {
+                        let session = lines[choice_index - 1].to_string();
+                        let attach_args = vec!["attach".to_string(), "-t".to_string(), session];
+
+                        match run_status("tmux", &attach_args) {
+                            Ok(_status) => (),
+                            Err(error) => panic!("error: {}", error),
+                        };
                     }
                 }
                 Err(error) => panic!("error: {}", error),
             }
+
             match std::str::from_utf8(&output.stderr) {
                 Ok(result) => println!("{}", result),
                 Err(error) => println!("{}", error),
@@ -78,3 +114,4 @@ fn main() {
         Err(error) => panic!("error: {}", error),
     };
 }
+

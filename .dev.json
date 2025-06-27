@@ -3,19 +3,25 @@
   "windows": [
     {
       "name": "Code",
-      "actions": [],
-      "pwd": ".",
-      "select": false
-    },
-    {
-      "name": "Build",
-      "actions": ["bacon"],
+      "actions": ["nvim"],
       "pwd": ".",
       "select": true
     },
     {
       "name": "Zsh",
       "actions": [],
+      "pwd": ".",
+      "select": false
+    },
+    {
+      "name": "Build",
+      "actions": ["cargo watch -x build"],
+      "pwd": ".",
+      "select": false
+    },
+    {
+      "name": "Test",
+      "actions": ["RUST_TEST_THREADS=1 cargo watch -x test"],
       "pwd": ".",
       "select": false
     }
