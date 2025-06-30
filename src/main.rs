@@ -48,11 +48,34 @@ fn main() {
                     if trimmed_choice.eq_ignore_ascii_case("n") {
                         let full_path = prompt_valid_path();
 
-                        let suggested_name = match full_path.file_name() {
-                            Some(name) => name.to_string_lossy().to_string(),
+                        let suggested_name = match full_path.file_name().and_then(|n| {
+                            let name_str = n.to_string_lossy();
+
+                            if name_str == "." || name_str == ".." || name_str.is_empty() {
+                                None
+                            } else {
+                                Some(name_str.to_string())
+                            }
+                        }) {
+                            Some(name) => name,
                             None => {
-                                println!("Could not extract session name from path.");
-                                return;
+                                print!("Enter a name for the new tmux session: ");
+
+                                io::stdout().flush().expect("Failed to flush stdout");
+
+                                let mut input_name = String::new();
+
+                                io::stdin()
+                                    .read_line(&mut input_name)
+                                    .expect("Failed to read input");
+
+                                let trimmed = input_name.trim();
+
+                                if trimmed.is_empty() {
+                                    println!("Session name cannot be empty.");
+                                    return;
+                                }
+                                trimmed.to_string()
                             }
                         };
 
@@ -65,6 +88,7 @@ fn main() {
                                     "-c".to_string(),
                                     full_path.display().to_string(),
                                 ];
+
                                 match run_status("tmux", &args) {
                                     Ok(_status) => (),
                                     Err(e) => panic!("Failed to start session: {}", e),
@@ -73,6 +97,7 @@ fn main() {
                             None => {
                                 let attach_args =
                                     vec!["attach".to_string(), "-t".to_string(), suggested_name];
+
                                 match run_status("tmux", &attach_args) {
                                     Ok(_status) => (),
                                     Err(e) => panic!("Failed to attach: {}", e),
@@ -114,4 +139,3 @@ fn main() {
         Err(error) => panic!("error: {}", error),
     };
 }
-
