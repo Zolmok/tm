@@ -1,50 +1,61 @@
-use std::process::{Command, ExitStatus, Output};
+use anyhow::{bail, Result};
+use std::process::{Command, Output};
 
 /// Executes a command and captures its standard output and error.
-///
-/// # Arguments
-///
-/// * `command` - The name of the command to run.
-/// * `args` - Arguments to pass to the command.
-///
-/// # Returns
-///
-/// * `Ok(Output)` if the command runs successfully.
-/// * `Err(std::io::Error)` if the command fails to start or run.
-pub fn run_output(command: &str, args: &[String]) -> Result<Output, std::io::Error> {
-    let output_result = Command::new(command).args(args).output();
-
-    match output_result {
-        Ok(output) => Ok(output),
-        Err(error) => Err(error),
-    }
+pub fn run_output(command: &str, args: &[String]) -> Result<Output> {
+    Ok(Command::new(command).args(args).output()?)
 }
 
-/// Executes a command and waits for its exit status.
-///
-/// # Arguments
-///
-/// * `command` - The name of the command to run.
-/// * `args` - Arguments to pass to the command.
-///
-/// # Returns
-///
-/// * `Ok(ExitStatus)` if the command completes.
-/// * `Err(std::io::Error)` if the command fails to spawn or wait.
-pub fn run_status(command: &str, args: &[String]) -> Result<ExitStatus, std::io::Error> {
-    let child_result = Command::new(command).args(args).spawn();
+/// Executes a command and waits for it to complete.
+/// Returns an error if the command fails or exits with non-zero status.
+pub fn run_status(command: &str, args: &[String]) -> Result<()> {
+    let mut child = Command::new(command).args(args).spawn()?;
+    let status = child.wait()?;
 
-    let mut child = match child_result {
-        Ok(result) => result,
-        Err(error) => return Err(error),
-    };
+    if !status.success() {
+        if let Some(code) = status.code() {
+            bail!("Command '{}' exited with status {}", command, code);
+        } else {
+            bail!("Command '{}' was terminated by signal", command);
+        }
+    }
 
-    match child.try_wait() {
-        Ok(Some(status)) => Ok(status),
-        Ok(None) => match child.wait() {
-            Ok(result) => Ok(result),
-            Err(error) => Err(error),
-        },
-        Err(error) => Err(error),
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_output_captures_stdout() {
+        let args = vec!["hello".to_string()];
+        let output = run_output("echo", &args).unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.trim() == "hello");
+    }
+
+    #[test]
+    fn run_output_with_multiple_args() {
+        let args = vec!["hello".to_string(), "world".to_string()];
+        let output = run_output("echo", &args).unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.trim() == "hello world");
+    }
+
+    #[test]
+    fn run_status_succeeds_for_true_command() {
+        let args: Vec<String> = vec![];
+        let result = run_status("true", &args);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn run_status_fails_for_false_command() {
+        let args: Vec<String> = vec![];
+        let result = run_status("false", &args);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("exited with status"));
     }
 }
